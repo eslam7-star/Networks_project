@@ -1,8 +1,8 @@
 
-import socket  # Import the socket module to handle network communication
+import socket
 
 # DNS server configuration
-DNS_PORT = 555  # Use a non-privileged port for the DNS server
+DNS_PORT = 5555  # Use port 5555 for the DNS server
 DNS_IP = "127.0.0.1"  # IP address for the DNS server (localhost)
 
 # DNS record database (for simplicity, using a dictionary)
@@ -14,7 +14,6 @@ dns_records = {
 }
 
 def handle_query(data):
-    print("ok")
     # Extract the domain name and query type from the DNS query
     domain_name, query_type = extract_domain_name_and_type(data)
     
@@ -91,5 +90,3 @@ def start_dns_server():
 
 if __name__ == "__main__":
     start_dns_server()  # Start the DNS server
-
-
