@@ -1,5 +1,5 @@
-
 import socket
+import threading
 
 # DNS server configuration
 DNS_PORT = 5555  # Use port 5555 for the DNS server
@@ -13,16 +13,18 @@ dns_records = {
     "ns.example.com": {"A": "93.184.216.36"}
 }
 
-def handle_query(data):
+def handle_query(data, addr, sock):
     # Extract the domain name and query type from the DNS query
     domain_name, query_type = extract_domain_name_and_type(data)
     
     # Check if the domain name is in the DNS records and if the query type is supported
     if domain_name in dns_records and query_type in dns_records[domain_name]:
         record_data = dns_records[domain_name][query_type]  # Get the record data
-        return build_response(data, record_data, query_type)  # Build and return the DNS response
+        response = build_response(data, record_data, query_type)  # Build and return the DNS response
     else:
-        return build_response(data, None, query_type)  # Return a response indicating no record found
+        response = build_response(data, None, query_type)  # Return a response indicating no record found
+    
+    sock.sendto(response, addr)  # Send the DNS response back to the client
 
 def extract_domain_name_and_type(data):
     # Extract the domain name from the DNS query packet
@@ -85,8 +87,7 @@ def start_dns_server():
     
     while True:
         data, addr = sock.recvfrom(512)  # Receive DNS query (max size 512 bytes)
-        response = handle_query(data)  # Handle the query and get the response
-        sock.sendto(response, addr)  # Send DNS response
+        threading.Thread(target=handle_query, args=(data, addr, sock)).start()  # Handle each query in a new thread
 
 if __name__ == "__main__":
     start_dns_server()  # Start the DNS server
