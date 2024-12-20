@@ -1,11 +1,13 @@
 import socket
-import threading
 
 # DNS server configuration
-DNS_PORT = 5555  # Use port 5555 for the DNS server
-DNS_IP = "127.0.0.1"  # IP address for the DNS server (localhost)
+DNS_PORT = 44444
+DNS_IP = '127.0.0.1'
 
-# DNS record database (for simplicity, using a dictionary)
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind((DNS_IP, DNS_PORT))
+
+# Simplified DNS record database
 dns_records = {
     "example.com": {"A": "93.184.216.34", "CNAME": "alias.example.com", "MX": "mail.example.com", "NS": "ns.example.com"},
     "alias.example.com": {"A": "93.184.216.34"},
@@ -13,102 +15,89 @@ dns_records = {
     "ns.example.com": {"A": "93.184.216.36"}
 }
 
-def handle_query(data, addr, sock):
-    # Extract the domain name and query type from the DNS query
-    domain_name, query_type = extract_domain_name_and_type(data)
-    
-    # Check if the domain name is in the DNS records and if the query type is supported
-    if domain_name in dns_records and query_type in dns_records[domain_name]:
-        record_data = dns_records[domain_name][query_type]  # Get the record data
-        response = build_response(data, record_data, query_type)  # Build and return the DNS response
-    else:
-        response = build_response(data, None, query_type)  # Return a response indicating no record found
-    
-    sock.sendto(response, addr)  # Send the DNS response back to the client
+def getflags():
+    QR = '1'
+    OPCODE = '0000'  # Standard query
+    AA = '1'  # Authoritative answer
+    TC = '0'  # Truncation not set
+    RD = '0'  # Recursion not desired
+    RA = '0'  # Recursion not available
+    Z = '000'  # Reserved
+    RCODE = '0000'  # No error
+    return int(QR + OPCODE + AA + TC + RD, 2).to_bytes(1, byteorder='big') + int(RA + Z + RCODE, 2).to_bytes(1, byteorder='big')
 
-def extract_domain_name_and_type(data):
-    # Extract the domain name from the DNS query packet
-    domain_name = ""
-    i = 12  # DNS query starts at byte 12
-    length = data[i]
-    while length != 0:
-        domain_name += data[i+1:i+1+length].decode() + "."  # Append each part of the domain name
-        i += length + 1
-        length = data[i]
-    domain_name = domain_name[:-1]  # Remove the trailing dot
-    
-    # Extract the query type (last two bytes of the query section)
-    query_type = data[i+5:i+7]
-    query_type = int.from_bytes(query_type, byteorder='big')  # Convert bytes to integer
-    
-    # Map query type to human-readable format
-    query_type_map = {1: "A", 5: "CNAME", 15: "MX", 2: "NS"}
-    return domain_name, query_type_map.get(query_type, "A")  # Default to "A" if type not found
+def parse_question(data):
+    domain_parts = []
+    offset = 0
+    while data[offset] != 0:
+        length = data[offset]
+        offset += 1
+        domain_parts.append(data[offset:offset + length].decode())
+        offset += length
+    domain_name = '.'.join(domain_parts)
+    qtype = data[offset + 1:offset + 3]
+    return domain_name, qtype
 
-
-def buildquestion(domainname, rectype):
+def build_question(domain_name, qtype):
     qbytes = b''
-
-    for part in domainname:
+    for part in domain_name.split('.'):
         length = len(part)
-        qbytes += bytes([length])
-
-        for char in part:
-            qbytes += ord(char).to_bytes(1, byteorder='big')
-
-    if rectype == 'a':
-        qbytes += (1).to_bytes(2, byteorder='big')
-
-    qbytes += (1).to_bytes(2, byteorder='big')
-
+        qbytes += bytes([length]) + part.encode()
+    qbytes += b'\x00'  # Null byte for the end of the domain name
+    qbytes += qtype + b'\x00\x01'  # QCLASS (IN)
     return qbytes
 
+def build_record(domain_name, qtype, ttl, value):
+    rbytes = b'\xc0\x0c'  # Pointer to domain name in question
+    if qtype == b'\x00\x01':  # A record
+        rbytes += b'\x00\x01'  # QTYPE (A)
+        rbytes += b'\x00\x01'  # QCLASS (IN)
+        rbytes += int(ttl).to_bytes(4, byteorder='big')  # TTL
+        rbytes += bytes([0, 4])  # Data length
+        rbytes += b''.join([bytes([int(part)]) for part in value.split('.')])
+    else:  # CNAME, MX, NS, etc.
+        if qtype == b'\x00\x05':  # CNAME
+            rbytes += b'\x00\x05'
+        elif qtype == b'\x00\x0f':  # MX
+            rbytes += b'\x00\x0f'
+        elif qtype == b'\x00\x02':  # NS
+            rbytes += b'\x00\x02'
+        rbytes += b'\x00\x01'
+        rbytes += int(ttl).to_bytes(4, byteorder='big')
+        rbytes += len(value).to_bytes(2, byteorder='big')
+        rbytes += value.encode()
+    return rbytes
 
-def build_response(query, record_data, query_type):
-    # Build a DNS response packet
-    transaction_id = query[:2]  # Transaction ID from the query
-    flags = b'\x81\x80'  # Standard query response, no error
-    qdcount = b'\x00\x01'  # Number of questions
-    ancount = b'\x00\x01' if record_data else b'\x00\x00'  # Number of answers
-    nscount = b'\x00\x00'  # Number of authority records
-    arcount = b'\x00\x00'  # Number of additional records
+def find_records(domain_name, qtype):
+    qtype_mapping = {
+        b'\x00\x01': 'A',
+        b'\x00\x05': 'CNAME',
+        b'\x00\x0f': 'MX',
+        b'\x00\x02': 'NS',
+    }
+    qtype_str = qtype_mapping.get(qtype, None)
+    if qtype_str and domain_name in dns_records and qtype_str in dns_records[domain_name]:
+        return [{"ttl": 300, "value": dns_records[domain_name][qtype_str]}]
+    return []
 
-    dns_header = transaction_id + flags + qdcount + ancount + nscount + arcount  # DNS header
-    dns_question = query[12:]  # DNS question section
-
-    if record_data:
-        # Answer section
-        dns_answer = b'\xc0\x0c'  # Pointer to the domain name in the question section
-        dns_answer += (b'\x00\x01' if query_type == "A" else
-                       b'\x00\x05' if query_type == "CNAME" else
-                       b'\x00\x0f' if query_type == "MX" else
-                       b'\x00\x02')  # Type A, CNAME, MX, or NS
-        dns_answer += b'\x00\x01'  # Class IN (internet)
-        dns_answer += b'\x00\x00\x00\x3c'  # TTL (60 seconds)
-        
-        if query_type == "A":
-            dns_answer += b'\x00\x04'  # Data length (4 bytes for IPv4 address)
-            dns_answer += bytes(map(int, record_data.split('.')))  # IP address in binary format
-        elif query_type in ["CNAME", "MX", "NS"]:
-            record_bytes = record_data.encode()  # Convert record data to bytes
-            dns_answer += len(record_bytes).to_bytes(2, byteorder='big')  # Data length
-            dns_answer += record_bytes  # Record data in binary format
-
-        
-        return dns_header + dns_question + dns_answer  # Complete DNS response
-    else:
-        return dns_header + dns_question  # Response with no answer
-
-def start_dns_server():
-    # Create a UDP socket
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DNS_IP, DNS_PORT))  # Bind the socket to the IP and port
+def build_response(data):
+    TransactionID = data[:2]
+    Flags = getflags()
+    QDCOUNT = b'\x00\x01'
+    domain_name, qtype = parse_question(data[12:])
+    records = find_records(domain_name, qtype)
+    ANCOUNT = len(records).to_bytes(2, byteorder='big')
+    NSCOUNT = (0).to_bytes(2, byteorder='big')
+    ARCOUNT = (0).to_bytes(2, byteorder='big')
     
-    print(f"DNS server started on {DNS_IP}:{DNS_PORT}")
-    
-    while True:
-        data, addr = sock.recvfrom(512)  # Receive DNS query (max size 512 bytes)
-        threading.Thread(target=handle_query, args=(data, addr, sock)).start()  # Handle each query in a new thread
+    dns_header = TransactionID + Flags + QDCOUNT + ANCOUNT + NSCOUNT + ARCOUNT
+    dns_question = build_question(domain_name, qtype)
+    dns_body = b''.join([build_record(domain_name, qtype, rec['ttl'], rec['value']) for rec in records])
 
-if __name__ == "__main__":
-    start_dns_server()  # Start the DNS server
+    return dns_header + dns_question + dns_body
+
+while True:
+    data, addr = sock.recvfrom(512)
+    response = build_response(data)
+    print(f"Response sent to {addr}: {response}")
+    sock.sendto(response, addr)
