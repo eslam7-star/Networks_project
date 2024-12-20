@@ -45,6 +45,25 @@ def extract_domain_name_and_type(data):
     query_type_map = {1: "A", 5: "CNAME", 15: "MX", 2: "NS"}
     return domain_name, query_type_map.get(query_type, "A")  # Default to "A" if type not found
 
+
+def buildquestion(domainname, rectype):
+    qbytes = b''
+
+    for part in domainname:
+        length = len(part)
+        qbytes += bytes([length])
+
+        for char in part:
+            qbytes += ord(char).to_bytes(1, byteorder='big')
+
+    if rectype == 'a':
+        qbytes += (1).to_bytes(2, byteorder='big')
+
+    qbytes += (1).to_bytes(2, byteorder='big')
+
+    return qbytes
+
+
 def build_response(query, record_data, query_type):
     # Build a DNS response packet
     transaction_id = query[:2]  # Transaction ID from the query
@@ -58,6 +77,7 @@ def build_response(query, record_data, query_type):
     dns_question = query[12:]  # DNS question section
 
     if record_data:
+        # Answer section
         dns_answer = b'\xc0\x0c'  # Pointer to the domain name in the question section
         dns_answer += (b'\x00\x01' if query_type == "A" else
                        b'\x00\x05' if query_type == "CNAME" else
@@ -68,12 +88,13 @@ def build_response(query, record_data, query_type):
         
         if query_type == "A":
             dns_answer += b'\x00\x04'  # Data length (4 bytes for IPv4 address)
-            dns_answer += socket.inet_aton(record_data)  # IP address in binary format
-        else:
+            dns_answer += bytes(map(int, record_data.split('.')))  # IP address in binary format
+        elif query_type in ["CNAME", "MX", "NS"]:
             record_bytes = record_data.encode()  # Convert record data to bytes
             dns_answer += len(record_bytes).to_bytes(2, byteorder='big')  # Data length
             dns_answer += record_bytes  # Record data in binary format
 
+        
         return dns_header + dns_question + dns_answer  # Complete DNS response
     else:
         return dns_header + dns_question  # Response with no answer
