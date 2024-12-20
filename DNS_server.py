@@ -1,4 +1,5 @@
 import socket
+import threading
 
 # DNS server configuration
 DNS_PORT = 44444
@@ -48,25 +49,29 @@ def build_question(domain_name, qtype):
     return qbytes
 
 def build_record(domain_name, qtype, ttl, value):
-    rbytes = b'\xc0\x0c'  # Pointer to domain name in question
+    rbytes = b'\xc0\x0c'  # Pointer to the domain name in question
     if qtype == b'\x00\x01':  # A record
         rbytes += b'\x00\x01'  # QTYPE (A)
         rbytes += b'\x00\x01'  # QCLASS (IN)
         rbytes += int(ttl).to_bytes(4, byteorder='big')  # TTL
         rbytes += bytes([0, 4])  # Data length
         rbytes += b''.join([bytes([int(part)]) for part in value.split('.')])
-    else:  # CNAME, MX, NS, etc.
+    elif qtype in {b'\x00\x05', b'\x00\x0f', b'\x00\x02'}:  # CNAME, MX, NS
         if qtype == b'\x00\x05':  # CNAME
             rbytes += b'\x00\x05'
         elif qtype == b'\x00\x0f':  # MX
             rbytes += b'\x00\x0f'
         elif qtype == b'\x00\x02':  # NS
             rbytes += b'\x00\x02'
-        rbytes += b'\x00\x01'
-        rbytes += int(ttl).to_bytes(4, byteorder='big')
-        rbytes += len(value).to_bytes(2, byteorder='big')
-        rbytes += value.encode()
+        rbytes += b'\x00\x01'  # QCLASS (IN)
+        rbytes += int(ttl).to_bytes(4, byteorder='big')  # TTL
+        alias_parts = value.split('.')
+        alias_bytes = b''.join([bytes([len(part)]) + part.encode() for part in alias_parts])
+        alias_bytes += b'\x00'  # Null byte to terminate the domain name
+        rbytes += len(alias_bytes).to_bytes(2, byteorder='big')  # Data length
+        rbytes += alias_bytes
     return rbytes
+
 
 def find_records(domain_name, qtype):
     qtype_mapping = {
@@ -89,15 +94,24 @@ def build_response(data):
     ANCOUNT = len(records).to_bytes(2, byteorder='big')
     NSCOUNT = (0).to_bytes(2, byteorder='big')
     ARCOUNT = (0).to_bytes(2, byteorder='big')
-    
+
     dns_header = TransactionID + Flags + QDCOUNT + ANCOUNT + NSCOUNT + ARCOUNT
     dns_question = build_question(domain_name, qtype)
     dns_body = b''.join([build_record(domain_name, qtype, rec['ttl'], rec['value']) for rec in records])
 
     return dns_header + dns_question + dns_body
 
-while True:
-    data, addr = sock.recvfrom(512)
+def handle_client(data, addr):
     response = build_response(data)
     print(f"Response sent to {addr}: {response}")
     sock.sendto(response, addr)
+
+def main():
+    print(f"DNS server running on {DNS_IP}:{DNS_PORT}")
+    while True:
+        data, addr = sock.recvfrom(512)
+        client_thread = threading.Thread(target=handle_client, args=(data, addr))
+        client_thread.start()
+
+if __name__ == "__main__":
+    main()
