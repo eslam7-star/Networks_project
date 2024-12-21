@@ -1,5 +1,6 @@
 import socket
 import threading
+import sys
 
 # DNS server configuration
 DNS_PORT = 44444
@@ -16,15 +17,18 @@ dns_records = {
     "ns.example.com": {"A": "93.184.216.36"}
 }
 
+# Track server metrics
+request_count = 0
+
 def getflags():
     QR = '1'
-    OPCODE = '0000'  # Standard query
-    AA = '1'  # Authoritative answer
-    TC = '0'  # Truncation not set
-    RD = '0'  # Recursion not desired
-    RA = '0'  # Recursion not available
-    Z = '000'  # Reserved
-    RCODE = '0000'  # No error
+    OPCODE = '0000'
+    AA = '1'
+    TC = '0'
+    RD = '0'
+    RA = '0'
+    Z = '000'
+    RCODE = '0000'
     return int(QR + OPCODE + AA + TC + RD, 2).to_bytes(1, byteorder='big') + int(RA + Z + RCODE, 2).to_bytes(1, byteorder='big')
 
 def parse_question(data):
@@ -44,34 +48,33 @@ def build_question(domain_name, qtype):
     for part in domain_name.split('.'):
         length = len(part)
         qbytes += bytes([length]) + part.encode()
-    qbytes += b'\x00'  # Null byte for the end of the domain name
-    qbytes += qtype + b'\x00\x01'  # QCLASS (IN)
+    qbytes += b'\x00'
+    qbytes += qtype + b'\x00\x01'
     return qbytes
 
 def build_record(domain_name, qtype, ttl, value):
-    rbytes = b'\xc0\x0c'  # Pointer to the domain name in question
-    if qtype == b'\x00\x01':  # A record
-        rbytes += b'\x00\x01'  # QTYPE (A)
-        rbytes += b'\x00\x01'  # QCLASS (IN)
-        rbytes += int(ttl).to_bytes(4, byteorder='big')  # TTL
-        rbytes += bytes([0, 4])  # Data length
+    rbytes = b'\xc0\x0c'
+    if qtype == b'\x00\x01':
+        rbytes += b'\x00\x01'
+        rbytes += b'\x00\x01'
+        rbytes += int(ttl).to_bytes(4, byteorder='big')
+        rbytes += bytes([0, 4])
         rbytes += b''.join([bytes([int(part)]) for part in value.split('.')])
-    elif qtype in {b'\x00\x05', b'\x00\x0f', b'\x00\x02'}:  # CNAME, MX, NS
-        if qtype == b'\x00\x05':  # CNAME
+    elif qtype in {b'\x00\x05', b'\x00\x0f', b'\x00\x02'}:
+        if qtype == b'\x00\x05':
             rbytes += b'\x00\x05'
-        elif qtype == b'\x00\x0f':  # MX
+        elif qtype == b'\x00\x0f':
             rbytes += b'\x00\x0f'
-        elif qtype == b'\x00\x02':  # NS
+        elif qtype == b'\x00\x02':
             rbytes += b'\x00\x02'
-        rbytes += b'\x00\x01'  # QCLASS (IN)
-        rbytes += int(ttl).to_bytes(4, byteorder='big')  # TTL
+        rbytes += b'\x00\x01'
+        rbytes += int(ttl).to_bytes(4, byteorder='big')
         alias_parts = value.split('.')
         alias_bytes = b''.join([bytes([len(part)]) + part.encode() for part in alias_parts])
-        alias_bytes += b'\x00'  # Null byte to terminate the domain name
-        rbytes += len(alias_bytes).to_bytes(2, byteorder='big')  # Data length
+        alias_bytes += b'\x00'
+        rbytes += len(alias_bytes).to_bytes(2, byteorder='big')
         rbytes += alias_bytes
     return rbytes
-
 
 def find_records(domain_name, qtype):
     qtype_mapping = {
@@ -102,6 +105,8 @@ def build_response(data):
     return dns_header + dns_question + dns_body
 
 def handle_client(data, addr):
+    global request_count
+    request_count += 1
     response = build_response(data)
     print(f"Response sent to {addr}: {response}")
     sock.sendto(response, addr)
@@ -113,5 +118,16 @@ def main():
         client_thread = threading.Thread(target=handle_client, args=(data, addr))
         client_thread.start()
 
+def cli():
+    while True:
+        command = input("Enter command (status/exit): ").strip().lower()
+        if command == "status":
+            print(f"Server running on {DNS_IP}:{DNS_PORT}")
+            print(f"Requests handled: {request_count}")
+        elif command == "exit":
+            print("Shutting down server.")
+            sys.exit()
+
 if __name__ == "__main__":
-    main()
+    threading.Thread(target=main).start()
+    cli()
