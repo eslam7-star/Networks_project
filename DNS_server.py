@@ -14,8 +14,17 @@ dns_records = {
     "example.com": {"A": "93.184.216.34", "CNAME": "alias.example.com", "MX": "mail.example.com", "NS": "ns.example.com"},
     "alias.example.com": {"A": "93.184.216.34"},
     "mail.example.com": {"A": "93.184.216.35"},
-    "ns.example.com": {"A": "93.184.216.36"}
+    "ns.example.com": {"A": "93.184.216.36"},
+    "google.com": {"A": "142.250.190.14", "MX": "aspmx.l.google.com", "NS": "ns1.google.com"},
+    "yahoo.com": {"A": "98.137.11.163", "MX": "mta5.am0.yahoodns.net", "NS": "ns1.yahoo.com"},
+    "bing.com": {"A": "204.79.197.200", "MX": "bingmail.microsoft.com", "NS": "ns1.bing.com"},
+    "github.com": {"A": "140.82.114.4", "CNAME": "github.com.edgekey.net", "NS": "ns1.githubdns.com"},
+    "stackoverflow.com": {"A": "151.101.193.69", "MX": "mail.stackoverflow.com", "NS": "ns1.stackdns.com"},
+    "amazon.com": {"A": "176.32.103.205", "MX": "mta.amazon.com", "NS": "ns1.amazon.com"},
+    "facebook.com": {"A": "157.240.221.35", "MX": "smtp.facebook.com", "NS": "a.ns.facebook.com"},
+    "twitter.com": {"A": "104.244.42.1", "MX": "smtp.twitter.com", "NS": "a.ns.twitter.com"}
 }
+
 
 # Track server metrics
 request_count = 0
