@@ -1,6 +1,7 @@
 import socket
 import threading
 import sys
+from datetime import datetime
 
 # DNS server configuration
 DNS_PORT = 44444
@@ -9,25 +10,40 @@ DNS_IP = '127.0.0.1'
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((DNS_IP, DNS_PORT))
 
-# Simplified DNS record database
-dns_records = {
-    "example.com": {"A": "93.184.216.34", "CNAME": "alias.example.com", "MX": "mail.example.com", "NS": "ns.example.com"},
-    "alias.example.com": {"A": "93.184.216.34"},
-    "mail.example.com": {"A": "93.184.216.35"},
-    "ns.example.com": {"A": "93.184.216.36"},
-    "google.com": {"A": "142.250.190.14", "MX": "aspmx.l.google.com", "NS": "ns1.google.com"},
-    "yahoo.com": {"A": "98.137.11.163", "MX": "mta5.am0.yahoodns.net", "NS": "ns1.yahoo.com"},
-    "bing.com": {"A": "204.79.197.200", "MX": "bingmail.microsoft.com", "NS": "ns1.bing.com"},
-    "github.com": {"A": "140.82.114.4", "CNAME": "github.com.edgekey.net", "NS": "ns1.githubdns.com"},
-    "stackoverflow.com": {"A": "151.101.193.69", "MX": "mail.stackoverflow.com", "NS": "ns1.stackdns.com"},
-    "amazon.com": {"A": "176.32.103.205", "MX": "mta.amazon.com", "NS": "ns1.amazon.com"},
-    "facebook.com": {"A": "157.240.221.35", "MX": "smtp.facebook.com", "NS": "a.ns.facebook.com"},
-    "twitter.com": {"A": "104.244.42.1", "MX": "smtp.twitter.com", "NS": "a.ns.twitter.com"}
-}
+# Load DNS records from file
+def load_dns_records(filename='dns_records.txt'):
+    dns_records = {}
+    try:
+        with open(filename, 'r') as file:
+            for line in file:
+                parts = line.strip().split(',')
+                if len(parts) == 3:
+                    domain_name, record_type, value = parts
+                    if domain_name not in dns_records:
+                        dns_records[domain_name] = {}
+                    dns_records[domain_name][record_type] = value
+    except FileNotFoundError:
+        print("No DNS records file found, starting with an empty record set.")
+    return dns_records
 
+# Save DNS records to the file
+def save_dns_record(domain_name, record_type, value, filename='dns_records.txt'):
+    with open(filename, 'a') as file:
+        file.write(f"{domain_name},{record_type},{value}\n")
+
+# Load DNS records from the file
+dns_records = load_dns_records()
 
 # Track server metrics
 request_count = 0
+
+def save_request_to_file(client_address, domain_name, response, answer):
+    with open('dns_requests.txt', 'a') as file:
+        # Log additional information about the answer (Type, TTL, IP or Alias)
+        record_type = answer['Type']
+        ttl = answer['TTL']
+        data = answer.get('IP', answer.get('Alias'))
+        file.write(f"{datetime.now()} | {client_address} | {domain_name} | {response.hex()} | Server Response-> Type: {record_type}, TTL: {ttl}, Data: {data}\n")
 
 def getflags():
     QR = '1'
@@ -111,13 +127,30 @@ def build_response(data):
     dns_question = build_question(domain_name, qtype)
     dns_body = b''.join([build_record(domain_name, qtype, rec['ttl'], rec['value']) for rec in records])
 
-    return dns_header + dns_question + dns_body
+    # Prepare the answer for logging
+    if records:
+        answer = {
+            "Type": 'A',  # Or extract the correct type based on records
+            "TTL": 300,
+            "IP": records[0]['value']  # Assuming it's an 'A' record
+        }
+    else:
+        answer = {
+            "Type": 'NXDOMAIN',
+            "TTL": 0,
+            "Alias": "No record found"
+        }
+
+    return dns_header + dns_question + dns_body, domain_name, answer
 
 def handle_client(data, addr):
     global request_count
     request_count += 1
-    response = build_response(data)
+    response, domain_name, answer = build_response(data)
+    
+    # Log request with detailed information
     print(f"Response sent to {addr}: {response}")
+    save_request_to_file(addr[0], domain_name, response, answer)
     sock.sendto(response, addr)
 
 def main():
@@ -129,13 +162,32 @@ def main():
 
 def cli():
     while True:
-        command = input("Enter command (status/exit): ").strip().lower()
+        command = input("Enter command (status/exit/showrecords/showrequests): ").strip().lower()
         if command == "status":
             print(f"Server running on {DNS_IP}:{DNS_PORT}")
             print(f"Requests handled: {request_count}")
         elif command == "exit":
             print("Shutting down server.")
             sys.exit()
+        elif command == "showrecords":
+            try:
+                with open('dns_records.txt', 'r') as file:
+                    print("DNS Records:")
+                    for line in file:
+                        print(line.strip())
+            except FileNotFoundError:
+                print("DNS records file not found.")
+        elif command == "showrequests":
+            try:
+                with open('dns_requests.txt', 'r') as file:
+                    print("DNS Request Log:")
+                    for line in file:
+                        print(line.strip())
+            except FileNotFoundError:
+                print("DNS requests file not found.")
+        else:
+            print("Invalid command. Please try again.")
+
 
 if __name__ == "__main__":
     threading.Thread(target=main).start()
