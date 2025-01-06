@@ -1,0 +1,81 @@
+SOA Record for tryhackme.com:
+Primary Name Server: kip.ns.cloudflare.com.
+Responsible Authority: dns.cloudflare.com.
+Serial: 2359552257
+Refresh: 10000
+Retry: 2400
+Expire: 604800
+Minimum TTL: 1800
+
+SOA Record for tryhackme.com:
+Primary Name Server: kip.ns.cloudflare.com.
+Responsible Authority: dns.cloudflare.com.
+Serial: 2359552257
+Refresh: 10000
+Retry: 2400
+Expire: 604800
+Minimum TTL: 1800
+
+SOA Record for tryhackme.com:
+Primary Name Server: kip.ns.cloudflare.com.
+Responsible Authority: dns.cloudflare.com.
+Serial: 2359552257
+Refresh: 10000
+Retry: 2400
+Expire: 604800
+Minimum TTL: 1800
+
+SOA Record for codeforces.com:
+Primary Name Server: fred.ns.cloudflare.com.
+Responsible Authority: dns.cloudflare.com.
+Serial: 2360715858
+Refresh: 10000
+Retry: 2400
+Expire: 604800
+Minimum TTL: 1800
+
+SOA Record for codeforces.com:
+Primary Name Server: fred.ns.cloudflare.com.
+Responsible Authority: dns.cloudflare.com.
+Serial: 2360715858
+Refresh: 10000
+Retry: 2400
+Expire: 604800
+Minimum TTL: 1800
+
+SOA Record for codeforces.com:
+Primary Name Server: fred.ns.cloudflare.com.
+Responsible Authority: dns.cloudflare.com.
+Serial: 2360715858
+Refresh: 10000
+Retry: 2400
+Expire: 604800
+Minimum TTL: 1800
+
+SOA Record for leetcode.com:
+Primary Name Server: melinda.ns.cloudflare.com.
+Responsible Authority: dns.cloudflare.com.
+Serial: 2361481960
+Refresh: 10000
+Retry: 2400
+Expire: 604800
+Minimum TTL: 1800
+
+SOA Record for leetcode.com:
+Primary Name Server: melinda.ns.cloudflare.com.
+Responsible Authority: dns.cloudflare.com.
+Serial: 2361481960
+Refresh: 10000
+Retry: 2400
+Expire: 604800
+Minimum TTL: 1800
+
+SOA Record for leetcode.com:
+Primary Name Server: melinda.ns.cloudflare.com.
+Responsible Authority: dns.cloudflare.com.
+Serial: 2361481960
+Refresh: 10000
+Retry: 2400
+Expire: 604800
+Minimum TTL: 1800
+
