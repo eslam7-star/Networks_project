@@ -13,6 +13,7 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.bind((DNS_IP, DNS_PORT))
 
 # Load DNS records from file
+# Load DNS records from file
 def load_dns_records(filename='dns_records.txt'):
     dns_records = {}
     try:
@@ -23,7 +24,9 @@ def load_dns_records(filename='dns_records.txt'):
                     domain_name, record_type, value = parts
                     if domain_name not in dns_records:
                         dns_records[domain_name] = {}
-                    dns_records[domain_name][record_type] = value
+                    if record_type not in dns_records[domain_name]:
+                        dns_records[domain_name][record_type] = []
+                    dns_records[domain_name][record_type].append(value)
     except FileNotFoundError:
         print("No DNS records file found, starting with an empty record set.")
     return dns_records
@@ -32,7 +35,13 @@ def load_dns_records(filename='dns_records.txt'):
 def save_dns_record(domain_name, record_type, value, filename='dns_records.txt'):
     with open(filename, 'a') as file:
         file.write(f"{domain_name},{record_type},{value}\n")
-    get_soa_record(domain_name)
+
+
+# Load DNS records from the file
+dns_records = load_dns_records()
+
+# Track server metrics
+request_count = 0
 
 def save_request_to_file(client_address, domain_name, response, answer):
     with open('dns_requests.txt', 'a') as file:
@@ -41,32 +50,6 @@ def save_request_to_file(client_address, domain_name, response, answer):
         ttl = answer['TTL']
         data = answer.get('IP', answer.get('Alias'))
         file.write(f"{datetime.now()} | {client_address} | {domain_name} | {response.hex()} | Server Response-> Type: {record_type}, TTL: {ttl}, Data: {data}\n")
-
-import dns.resolver
-
-def get_soa_record(domain):
-    try:
-        # Querying for SOA record of the domain
-        soa = dns.resolver.resolve(domain, 'SOA')
-        
-        # Open the master.txt file in append mode to write the records
-        with open("master.txt", "a") as file:
-            file.write(f"SOA Record for {domain}:\n")
-            for record in soa:
-                file.write(f"Primary Name Server: {record.mname}\n")
-                file.write(f"Responsible Authority: {record.rname}\n")
-                file.write(f"Serial: {record.serial}\n")
-                file.write(f"Refresh: {record.refresh}\n")
-                file.write(f"Retry: {record.retry}\n")
-                file.write(f"Expire: {record.expire}\n")
-                file.write(f"Minimum TTL: {record.minimum}\n")
-            file.write("\n")  # Add a newline for separation between records
-    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN) as e:
-        with open("master.txt", "a") as file:
-            file.write(f"Error fetching SOA record for {domain}: {e}\n")
-            file.write("\n")
-
-
 
 def getflags():
     QR = '1'
@@ -289,30 +272,16 @@ def main():
 
 
 def auth(isauthenticated):
-    while True:
+    while(1):
         login = input("login? y or n :")
         if login == "n":
             return 0
-        
         user_name = input("enter username: ")
         password = input("enter password: ")
-        
-        # Open the admins.txt file
-        with open("admins.txt", "r") as file:
-            # Read all lines in the file
-            for line in file:
-                # Strip any leading/trailing whitespace
-                line = line.strip()
-                # Split the line into username and password
-                stored_username, stored_password = line.split()
-                
-                # Check if the entered username and password match
-                if user_name == stored_username and password == stored_password:
-                    return 1  # Authentication successful
-        
-        # If no match found, authentication failed
-        print("authentication failed, invalid login")
-
+        if user_name != "admin" or password != "admin" :
+            print("authentication failed, invlaid login")
+        else:    
+            return 1
 
 def cli():
     isauthenticated = 0
@@ -350,12 +319,6 @@ def cli():
                 print("DNS requests file not found.")
         else:
             print("Invalid command. Please try again.")
-
-# Load DNS records from the file
-dns_records = load_dns_records()
-
-# Track server metrics
-request_count = 0
 
 if __name__ == "__main__":
     threading.Thread(target=main).start()

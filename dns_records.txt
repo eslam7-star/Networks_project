@@ -33,3 +33,11 @@ hackerone.com,A,172.64.151.42
 hackerone.com,A,104.18.36.214
 openai.com,A,172.64.154.211
 openai.com,A,104.18.33.45
+eng.asu.edu.eg,000f,
+eng.asu.edu.eg,A,193.227.20.133
+pypi.com,A,13.248.169.48
+pypi.com,A,76.223.54.146
+pypi.com,000f,
+tryhackme.com,A,104.22.54.228
+tryhackme.com,A,104.22.55.228
+tryhackme.com,A,172.67.27.10
