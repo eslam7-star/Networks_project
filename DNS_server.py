@@ -266,7 +266,21 @@ def main():
         client_thread = threading.Thread(target=handle_client, args=(data, addr))
         client_thread.start()
 
+
+def auth(isauthenticated):
+    while(1):
+        login = input("login? y or n :")
+        if login == "n":
+            return 0
+        user_name = input("enter username: ")
+        password = input("enter password: ")
+        if user_name != "admin" or password != "admin" :
+            print("authentication failed, invlaid login")
+        else:    
+            return 1
+
 def cli():
+    isauthenticated = 0
     while True:
         command = input("Enter command (status/exit/showrecords/showrequests): ").strip().lower()
         if command == "status":
@@ -276,6 +290,10 @@ def cli():
             print("Shutting down server.")
             sys.exit()
         elif command == "showrecords":
+            if not isauthenticated:
+                isauthenticated = auth(isauthenticated)
+                if not isauthenticated:
+                    continue
             try:
                 with open('dns_records.txt', 'r') as file:
                     print("DNS Records:")
@@ -284,6 +302,10 @@ def cli():
             except FileNotFoundError:
                 print("DNS records file not found.")
         elif command == "showrequests":
+            if not isauthenticated:
+                isauthenticated = auth(isauthenticated)
+                if not isauthenticated:
+                    continue
             try:
                 with open('dns_requests.txt', 'r') as file:
                     print("DNS Request Log:")

@@ -31,3 +31,5 @@ twitter.com,MX,smtp.twitter.com
 twitter.com,NS,a.ns.twitter.com
 hackerone.com,A,172.64.151.42
 hackerone.com,A,104.18.36.214
+openai.com,A,172.64.154.211
+openai.com,A,104.18.33.45
